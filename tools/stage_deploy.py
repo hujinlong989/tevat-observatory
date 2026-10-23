@@ -47,6 +47,19 @@ def main():
     print("暂存完成: %s" % STAGE)
     print("合计: %.1f KB / %d 个文件" % (total / 1024, sum(len(fs) for _, _, fs in os.walk(STAGE))))
 
+    # 生产版钉死：禁用调试直达
+    # （公网域名理论上不该命中本地白名单，但这是发布到开放互联网的东西，多钉一道）
+    idx = os.path.join(STAGE, "index.html")
+    s = open(idx, encoding="utf-8").read()
+    old = "const localDev = isLocalDevHost(currentHost());"
+    new = "const localDev = false;  // 生产部署版：禁用调试直达"
+    if old not in s:
+        print("!! 未找到 localDev 赋值行，index.html 结构可能变了，终止发布")
+        sys.exit(1)
+    s = s.replace(old, new)
+    open(idx, "w", encoding="utf-8").write(s)
+    print("已关闭调试直达（生产版）")
+
     # 自检：暂存目录里不该出现任何开发中间物
     bad = []
     for dirpath, dirnames, filenames in os.walk(STAGE):
