@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#05070a">
+<meta name="description" content="提瓦特观测站 · 8bit 解谜终端：找回三段密钥，让星图重新亮起。">
+<title>提瓦特观测站 // TEVAT ARCHIVE TERMINAL</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%2305070a'/%3E%3Cpath d='M8 1l1.9 4.2 4.6.5-3.4 3 1 4.5L8 11 3.9 13.2l1-4.5-3.4-3 4.6-.5z' fill='%23ffd279'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- 背景层：字符雨（在终端之下） -->
+<div id="bgfx"><canvas id="fx"></canvas></div>
+
+<!-- CRT 效果层：扫描线 + 暗角（在一切之上，不拦截交互） -->
+<div id="crt"></div>
+
+<!-- 终端 -->
+<div id="term">
+  <div id="term-head">
+    <span>提瓦特观测站 <b>TERMINAL</b></span>
+    <span id="head-status">● STANDBY</span>
+  </div>
+  <div id="term-body">
+    <div id="out"></div>
+    <div id="stage"></div>
+    <div id="pw-wrap" class="hidden">
+      <div id="pw-label"></div>
+      <div id="pw-dots"></div>
+      <div id="pw-msg"></div>
+      <div id="pw-sound">♪ 轻触数字键可开启音效</div>
+    </div>
+  </div>
+  <div id="term-foot">
+    <span id="foot-l">提瓦特观测站 · 观测节点 · 加密信道</span>
+    <span id="foot-r">LEVEL 1/3</span>
+  </div>
+  <div id="keys" class="hidden"></div>
+  <input id="kbd" type="text" inputmode="numeric" readonly autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="密钥输入">
+</div>
+
+<!-- 警报 -->
+<div id="count"></div>
+<div id="alertbar"></div>
+
+<!-- 终局 -->
+<div id="finale">
+  <canvas id="gl"></canvas>
+  <!-- 祈愿结果条：解开的三段密钥对应的那三个人 -->
+  <div id="fin-strip">
+    <div class="pull"><img src="assets/sprite/hutao.png" alt=""><b>胡 桃</b><span>★★★★★</span></div>
+    <div class="pull"><img src="assets/sprite/zhongli.png" alt=""><b>钟 离</b><span>★★★★★</span></div>
+    <div class="pull"><img src="assets/sprite/raiden.png" alt=""><b>雷电将军</b><span>★★★★★</span></div>
+  </div>
+  <div id="fin-ui">
+    <div id="fin-title">星 图 已 重 启</div>
+    <div id="fin-sub">TEVAT OBSERVATORY</div>
+    <div id="fin-sign">—— 观测站 · 记录员</div>
+    <div id="fin-gift">三段密钥已回收 · 提瓦特欠你一个愿望</div>
+    <div id="fin-hint">轻触屏幕 · 放一束烟花</div>
+  </div>
+</div>
+
+<!-- 访问密码门（公网访问时挡在一切之前） -->
+<div id="lock">
+  <div class="lock-box">
+    <div class="lock-title">提瓦特观测站</div>
+    <div class="lock-sub">TEVAT OBSERVATORY · ENCRYPTED CHANNEL</div>
+    <div class="lock-rule"></div>
+    <div class="lock-hint">请输入访问口令</div>
+    <input id="lock-input" type="text" inputmode="numeric" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="访问口令">
+    <div id="lock-dots">····</div>
+    <div id="lock-msg"></div>
+    <div id="lock-keys">
+      <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button>
+      <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
+      <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
+      <button data-k="0">0</button><button data-k="del" class="go">DEL</button><button data-k="ok" class="go" style="grid-column: span 3">ENTER</button>
+    </div>
+    <div class="lock-foot">仅限观测员查看 · 请勿外传链接</div>
+  </div>
+</div>
+
+<!-- 开场 -->
+<div id="boot">
+  <div class="ring"></div>
+  <div class="b1" style="margin-top:20px">提瓦特观测站</div>
+  <div class="b2">TEVAT ARCHIVE TERMINAL v1.0</div>
+  <div class="b2" style="margin-top:30px;color:#5aff9c">系 统 自 检 中 …</div>
+  <div class="b2" style="margin-top:8px;color:#1f6b45">建议佩戴耳机 · 打开声音</div>
+</div>
+
+<script src="vendor/three.min.js"></script>
+<script src="js/devhost.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/lock.js"></script>
+<script src="js/terminal.js"></script>
+<script src="js/finale.js"></script>
+<script>
+/* ---------- CRT 字符雨 / 噪点 ---------- */
+(function () {
+  const cv = document.getElementById('fx');
+  const g = cv.getContext('2d');
+  const CH = '0123456789ABCDEFabcdef<>[]{}/\\|=+*#$%&@~^';
+  let cols = [], W = 0, H = 0, alive = true;
+
+  function fit() {
+    const s = 3;
+    W = Math.ceil(cv.clientWidth / s); H = Math.ceil(cv.clientHeight / s);
+    cv.width = W; cv.height = H;
+    cv.style.imageRendering = 'pixelated';
+    cols = new Array(Math.ceil(W / 6)).fill(0).map(() => Math.random() * H);
+  }
+  function frame() {
+    if (!alive) return;
+    g.fillStyle = 'rgba(5,7,10,0.16)';
+    g.fillRect(0, 0, W, H);
+    g.font = '6px monospace';
+    for (let i = 0; i < cols.length; i++) {
+      const y = cols[i];
+      const x = i * 6;
+      g.fillStyle = 'rgba(90,255,156,0.42)';
+      g.fillText(CH[(Math.random() * CH.length) | 0], x, y);
+      cols[i] = y > H + 10 ? 0 : y + 5;
+    }
+    if (Math.random() < 0.035) {
+      const yy = (Math.random() * H) | 0, hh = 1 + ((Math.random() * 5) | 0);
+      const im = g.getImageData(0, yy, W, hh);
+      g.putImageData(im, (Math.random() * 8 - 4) | 0, yy);
+    }
+    requestAnimationFrame(frame);
+  }
+  window.addEventListener('resize', fit);
+  fit(); frame();
+  window.__fxStop = () => { alive = false; };
+})();
+
+/* ---------- 开场 ---------- */
+(function () {
+  const boot = document.getElementById('boot');
+  let started = false;
+  // 调试直达白名单：只认回环地址与内网段；任何公网域名都进不来
+  const localDev = isLocalDevHost(currentHost());
+  window.__LOCAL_DEV = localDev;
+  function begin() {
+    if (started) return; started = true;
+    console.log('[BOOT] begin fired');
+    document.getElementById('head-status').textContent = '● ACTIVE';
+    try { SFX.ensure(); SFX.unlock(); } catch (e) { console.log('[BOOT] sfx error:', e && e.message); }
+    boot.style.transition = 'none';
+    let bo = 1;
+    const bfade = setInterval(() => {
+      bo -= 0.07;
+      boot.style.opacity = Math.max(0, bo);
+      if (bo <= 0) { clearInterval(bfade); boot.style.display = 'none'; }
+    }, 45);
+    try { FINALE.init(); } catch (e) { console.log('[BOOT] finale error:', e && e.message); }
+    if (localDev) {
+      if (location.search.indexOf('finale') >= 0 || location.hash.indexOf('finale') >= 0) { FINALE.start(); return; }
+      if (location.search.indexOf('lvl2') >= 0 || location.hash.indexOf('lvl2') >= 0) { T.runFrom(2); return; }
+      if (location.search.indexOf('lvl3') >= 0 || location.hash.indexOf('lvl3') >= 0) { T.runFrom(3); return; }
+    }
+    T.run();
+  }
+  // 密码门放行后才允许启动
+  function gateBegin() {
+    if (LOCK && !LOCK.isUnlocked()) return;
+    begin();
+  }
+  window.__BOOT_BEGIN = gateBegin;
+  boot.addEventListener('click', gateBegin);
+  document.addEventListener('pointerdown', function (e) {
+    if (!started) { gateBegin(); }
+  }, { passive: true });
+  window.addEventListener('keydown', function once(e) {
+    if (!started) { gateBegin(); window.removeEventListener('keydown', once); }
+  });
+  if (location.search.indexOf('auto') >= 0) { setTimeout(gateBegin, 60); }
+  else { setTimeout(gateBegin, 2200); }
+  document.body.dataset.js = 'ok';
+})();
+
+/* ---------- 访问密码门 ---------- */
+(function () {
+  const ok = LOCK.init();
+  if (ok) return;
+  const boot = document.getElementById('boot');
+  if (boot) boot.style.opacity = '0';
+  window.__LOCK_OPEN = function () {
+    if (boot) { boot.style.transition = 'opacity .5s'; boot.style.opacity = '1'; }
+    setTimeout(function () {
+      if (window.__BOOT_BEGIN) window.__BOOT_BEGIN();
+    }, 600);
+  };
+})();
+
+/* ---------- 运行时错误捕获（便于 headless 诊断） ---------- */
+window.addEventListener('error', function (e) {
+  const d = document.createElement('div');
+  d.id = 'errlog';
+  d.style.cssText = 'position:fixed;left:0;top:0;z-index:999;color:#f66;font-size:10px;background:#000;padding:4px;max-width:100%;white-space:pre-wrap';
+  d.textContent = 'ERR: ' + (e.message || '') + ' @ ' + (e.filename || '').split('/').pop() + ':' + (e.lineno || '');
+  document.body.appendChild(d);
+});
+</script>
+</body>
+</html>

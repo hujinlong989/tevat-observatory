@@ -1,0 +1,27 @@
+# 开发中间产物（不随仓库分发）
+_dev/
+*.bak
+*.bak-*
+
+# 字体构建中间物
+*.zip
+fusion/
+subset_chars.txt
+
+# 系统垃圾
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
+
+# Node（验收脚本只用 playwright，本仓库无 npm 依赖）
+node_modules/
+package-lock.json
+
+# 本地部署暂存
+_deploy*/
+dist/
