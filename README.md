@@ -131,13 +131,31 @@ npx serve .
 `tools/` 下是开发期用的自动化验收，需要本机装有 Playwright：
 
 ```bash
-node tools/check_e2e.js      # 端到端通关：口令 → 三层 → 终局
-node tools/check_layout.js   # 五个视口的终局布局（出界 / 重叠 / 压字）
-node tools/capture_story.js  # 整条故事线分镜截图
+node tools/check_e2e.js             # 端到端通关：口令 → 三层 → 终局
+node tools/check_layout.js          # 五个视口的终局布局（出界 / 重叠 / 压字）
+node tools/capture_story.js         # 整条故事线分镜截图
+node tools/audit_teaser_leak.js     # 预告片泄密审计：逐帧取可见文本，与密钥串对撞
+node tools/capture_teaser.js        # 预告片分镜抓帧（自带四层泄密防护）
+python tools/build_font_subset.py   # 重建中文像素字体子集
+python tools/stage_deploy.py        # 生成发布暂存目录（并自检无开发中间物）
 ```
 
 脚本默认指向 `http://127.0.0.1:8900`，用环境变量 `SITE_URL` 覆盖。
 `check_e2e.js` / `check_layout.js` 里的访问口令需要跟 `js/lock.js` 保持一致。
+`capture_teaser.js` 的抓帧输出目录用环境变量 `TEASER_WORK` 指定。
+
+### 预告片泄密防护
+
+预告片里**不允许出现任何一段密钥**，也不能出现能反推密钥的画面。
+`capture_teaser.js` 里有四层防护：
+
+1. 删掉直接回显密钥的终端行（`KEY ACCEPTED` / 带值的胶片时间戳 / 指向 12/31 的台词）
+2. 藏掉胶片画面上的时间戳覆盖层
+3. 日历停靠日若为 12/31，改成中性的 11/29
+4. 兜底：`#out` / `#stage` / `#term-foot` 再扫一遍密钥串，命中就抹掉
+
+`audit_teaser_leak.js` 则是**独立的验收方**：重放同一条流程，逐帧取页面可见文本，
+与密钥串、以及「一年的最后一天」「20:26」「12-31」这类等价表述对撞，命中即失败。
 
 ---
 
