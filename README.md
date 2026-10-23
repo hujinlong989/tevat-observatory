@@ -6,6 +6,9 @@
 
 零依赖构建、零后端、零配置 —— 克隆下来用任意静态服务器打开 `index.html` 就能玩。
 
+**在线试玩：<https://7jjawzgi9d6hp.space.mcode.cn>**
+（访问口令 `0928`；这是客户端校验的口令，看源码即可获得，作用只是挡住"随手点开"的人。）
+
 | 口令门 | Level 1 档案卡 | 终局 · 祈愿结果条 |
 |---|---|---|
 | ![口令门](docs/cover-lock.png) | ![Level 1](docs/screen-l1.png) | ![终局](docs/cover-finale.png) |
